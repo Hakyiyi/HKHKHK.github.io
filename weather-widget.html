@@ -570,22 +570,38 @@
             return `${month}/${day}`;
         }
 
-        // 페이지 로드 시 즉시 실행 (DOMContentLoaded 기다리지 않고)
+        // 페이지 로드 시 즉시 실행
         window.addEventListener('load', function() {
-            console.log('페이지 로드됨, 샘플 데이터 표시 시작');
-            displaySampleWeather();
+            console.log('페이지 로드됨, API 호출 시작');
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                console.log('API 키 감지, 실제 데이터 요청');
+                getWeatherData();
+            } else {
+                console.log('API 키 없음, 샘플 데이터 표시');
+                displaySampleWeather();
+            }
         });
 
         // DOMContentLoaded에서도 실행 (백업용)
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM 로드됨');
-            displaySampleWeather();
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                getWeatherData();
+            } else {
+                displaySampleWeather();
+            }
         });
 
         // 즉시 실행 (스크립트 로드와 동시에)
         setTimeout(function() {
-            console.log('타이머로 샘플 데이터 표시');
-            displaySampleWeather();
+            console.log('타이머로 데이터 표시');
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                console.log('API 키 있음, 실제 API 호출');
+                getWeatherData();
+            } else {
+                console.log('API 키 없음, 샘플 데이터 표시');
+                displaySampleWeather();
+            }
         }, 100);
 
         // 5분마다 자동 새로고침
