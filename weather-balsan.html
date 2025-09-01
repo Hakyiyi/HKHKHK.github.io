@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">날씨 정보</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: transparent;
+            color: #333;
+            padding: 15px;
+        }
+
+        .weather-container {
+            max-width: 100%;
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            flex-wrap: nowrap;
+        }
+
+        .main-weather {
+            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 15px;
+            width: 210px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+        }
+
+        .date-location {
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+
+        .main-temp-section {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 8px 0;
+        }
+
+        .current-temp {
+            font-size: 36px;
+            font-weight: 300;
+            margin-right: 8px;
+        }
+
+        .weather-icon-main {
+            font-size: 28px;
+            opacity: 0.9;
+        }
+
+        .temp-range {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 4px;
+        }
+
+        .hourly-forecast {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .forecast-title {
+            display: none;
+        }
+
+        .hourly-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+
+        .hourly-item {
+            text-align: center;
+            padding: 8px 4px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            font-size: 11px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+            min-width: 70px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 140px;
+        }
+
+        .hourly-item:hover {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        .hour-date {
+            font-size: 9px;
+            color: #6c757d;
+            margin-bottom: 2px;
+            font-weight: 500;
+        }
+
+        .hour {
+            font-size: 10px;
+            color: #495057;
+            margin-bottom: 3px;
+            font-weight: 600;
+        }
+
+        .weather-icon {
+            font-size: 16px;
+            margin: 2px 0;
+        }
+
+        .hour-temp {
+            font-size: 12px;
+            font-weight: 600;
+            margin: 2px 0;
+            color: #333;
+        }
+
+        .rain-percent {
+            font-size: 9px;
+            color: #4A90E2;
+            margin-top: 1px;
+            font-weight: 500;
+        }
+
+        .update-time {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 10px;
+            color: #6c757d;
+            width: 100%;
+        }
+
+        .loading, .error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #6c757d;
+            width: 100%;
+            height: 140px;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .weather-container {
+                height: auto;
+                min-height: 140px;
+            }
+
+            .main-weather {
+                width: 210px;
+                height: 140px;
+                flex-shrink: 0;
+            }
+
+            .hourly-forecast {
+                height: 140px;
+            }
+
+            .hourly-item {
+                height: 140px;
+                min-width: 60px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .main-weather {
+                padding: 12px;
+                width: 180px;
+                height: 140px;
+            }
+
+            .hourly-item {
+                padding: 6px 2px;
+                font-size: 10px;
+                min-width: 50px;
+                height: 140px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="weather-container" id="weather-content">
+        <div class="loading">날씨 정보를 불러오는 중...</div>
+    </div>
+
+    <div class="update-time" id="update-time"></div>
+
+    <script>
+        // 격자 좌표와 지역명 매핑
+        const LOCATIONS = {
+            '98_76': '중구 남포동',
+          '57_126': '강서구 내발산동',
+            '89_90': '강남구',
+            '60_127': '중구 명동',
+            '55_127': '용산구',
+            // 필요에 따라 더 추가 가능
+        };
+        
+        // 현재 설정된 격자 좌표
+        const NX = 57;
+        const NY = 126;
+        const LOCATION_NAME = LOCATIONS[`${NX}_${NY}`] || '알 수 없는 지역';
+
+        // 기상청 API 설정 - 브런치 글 참고한 단기예보 사용
+        const API_KEY = 'bc52aa8376a24db52236c5209de105ce4792e7e1d6c7c034db99c156590911bf'; // 공공데이터포털에서 발급받은 키
+        const BASE_URL = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0';
+
+        // 날씨 코드 매핑 (브런치 글에서 언급한 하늘상태 정보)
+        const skyConditions = {
+            '1': { icon: '☀️', text: '맑음' },
+            '3': { icon: '🌤️', text: '구름많음' },
+            '4': { icon: '☁️', text: '흐림' }
+        };
+
+        const precipConditions = {
+            '0': { icon: '', text: '' },
+            '1': { icon: '🌧️', text: '비' },
+            '2': { icon: '🌨️', text: '비/눈' },
+            '3': { icon: '❄️', text: '눈' },
+            '4': { icon: '🌦️', text: '소나기' }
+        };
+
+        // 브런치 글에서 언급한 발표시간 계산
+        function getBaseDateTime() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            
+            // 단기예보 발표시간: 02, 05, 08, 11, 14, 17, 20, 23시 (하루 8번)
+            const baseTimes = ['0200', '0500', '0800', '1100', '1400', '1700', '2000', '2300'];
+            let baseTime = '0200';
+            
+            // 현재 시간보다 이전의 가장 최근 발표시간 찾기
+            for (let i = baseTimes.length - 1; i >= 0; i--) {
+                const baseHour = parseInt(baseTimes[i].substring(0, 2));
+                if (hours > baseHour || (hours === baseHour && minutes >= 10)) {
+                    baseTime = baseTimes[i];
+                    break;
+                }
+            }
+            
+            // 현재 시간이 첫 발표시간(02:10) 이전이면 전날 23시 사용
+            if (hours < 2 || (hours === 2 && minutes < 10)) {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                return {
+                    date: formatDate(yesterday),
+                    time: '2300'
+                };
+            }
+            
+            return {
+                date: formatDate(now),
+                time: baseTime
+            };
+        }
+
+        async function getWeatherData() {
+            try {
+                const baseDateTime = getBaseDateTime();
+                
+                const params = new URLSearchParams({
+                    serviceKey: API_KEY,
+                    pageNo: '1',
+                    numOfRows: '1000',
+                    dataType: 'JSON',
+                    base_date: baseDateTime.date,
+                    base_time: baseDateTime.time,
+                    nx: NX,
+                    ny: NY
+                });
+
+                const response = await fetch(`${BASE_URL}/getVilageFcst?${params}`);
+                
+                if (!response.ok) {
+                    throw new Error('API 호출 실패');
+                }
+
+                const data = await response.json();
+                
+                if (data.response.header.resultCode !== '00') {
+                    throw new Error('데이터 조회 실패: ' + data.response.header.resultMsg);
+                }
+
+                const items = data.response.body.items.item;
+                processWeatherData(items);
+
+            } catch (error) {
+                console.error('날씨 데이터 로드 실패:', error);
+                displaySampleWeather();
+            }
+        }
+
+        function processWeatherData(items) {
+            const currentTime = new Date();
+            const currentDateStr = formatDate(currentTime);
+            const currentHour = currentTime.getHours();
+            
+            // 시간별 데이터 그룹화
+            const hourlyData = {};
+            
+            items.forEach(item => {
+                const dateTime = `${item.fcstDate}_${item.fcstTime}`;
+                if (!hourlyData[dateTime]) {
+                    hourlyData[dateTime] = {
+                        date: item.fcstDate,
+                        time: item.fcstTime
+                    };
+                }
+                
+                // 브런치 글에서 언급한 각 카테고리별 데이터
+                switch(item.category) {
+                    case 'TMP': // 1시간 기온
+                        hourlyData[dateTime].temp = parseInt(item.fcstValue);
+                        break;
+                    case 'SKY': // 하늘상태 (브런치에서 중요하다고 한 정보)
+                        hourlyData[dateTime].sky = item.fcstValue;
+                        break;
+                    case 'PTY': // 강수형태
+                        hourlyData[dateTime].pty = item.fcstValue;
+                        break;
+                    case 'POP': // 강수확률
+                        hourlyData[dateTime].pop = parseInt(item.fcstValue);
+                        break;
+                }
+            });
+
+            // 현재 시간과 가장 가까운 예보 시간 찾기 (브런치 글에서 언급한 중요한 부분)
+            const sortedKeys = Object.keys(hourlyData).sort();
+            let currentWeather = null;
+            
+            for (let key of sortedKeys) {
+                const data = hourlyData[key];
+                const forecastHour = parseInt(data.time.substring(0, 2));
+                
+                // 현재 시간과 가장 가까운 예보 시간 선택
+                if (data.date === currentDateStr && forecastHour >= currentHour) {
+                    currentWeather = data;
+                    break;
+                }
+            }
+            
+            // 현재 시간 이후 예보가 없으면 가장 가까운 과거 예보 사용
+            if (!currentWeather) {
+                for (let i = sortedKeys.length - 1; i >= 0; i--) {
+                    const data = hourlyData[sortedKeys[i]];
+                    if (data.date === currentDateStr) {
+                        currentWeather = data;
+                        break;
+                    }
+                }
+            }
+            
+            if (!currentWeather) {
+                currentWeather = hourlyData[sortedKeys[0]];
+            }
+
+            // 오늘과 내일의 최고/최저 온도 계산
+            const todayTemps = [];
+            
+            Object.values(hourlyData).forEach(data => {
+                if (data.date === currentDateStr && data.temp !== undefined) {
+                    todayTemps.push(data.temp);
+                }
+            });
+            
+            const minTemp = Math.min(...todayTemps);
+            const maxTemp = Math.max(...todayTemps);
+
+            displayWeather(currentWeather, hourlyData, sortedKeys, minTemp, maxTemp);
+        }
+
+        function displayWeather(currentWeather, hourlyData, sortedKeys, minTemp, maxTemp) {
+            // 페이지 제목 업데이트
+            document.getElementById('page-title').textContent = `${LOCATION_NAME} 날씨`;
+            
+            // 현재 날씨 상태 결정
+            const skyCode = currentWeather.sky || '3';
+            const ptyCode = currentWeather.pty || '0';
+            
+            let weatherIcon = skyConditions[skyCode]?.icon || '🌤️';
+            let weatherText = skyConditions[skyCode]?.text || '구름많음';
+            
+            // 강수형태가 있으면 우선 표시
+            if (ptyCode !== '0') {
+                weatherIcon = precipConditions[ptyCode]?.icon || weatherIcon;
+                weatherText = precipConditions[ptyCode]?.text || weatherText;
+            }
+
+            const currentTemp = currentWeather.temp || 26;
+            
+            // 날짜 포맷팅
+            const weatherTime = new Date();
+            const dateStr = formatDateDisplay(weatherTime);
+            const dayName = ['일', '월', '화', '수', '목', '금', '토'][weatherTime.getDay()];
+
+            let hourlyItems = '';
+            
+            // 현재 시간 기준으로 -1시간부터 +7시간까지 (총 9시간)
+            const currentTime = new Date();
+            const currentHour = currentTime.getHours();
+            const targetHours = [];
+            
+            // -1시간부터 +7시간까지의 시간대 생성
+            for (let i = -1; i <= 7; i++) {
+                const targetDate = new Date(currentTime);
+                targetDate.setHours(currentHour + i);
+                targetHours.push({
+                    date: formatDate(targetDate),
+                    time: String(targetDate.getHours()).padStart(2, '0') + '00',
+                    displayDate: targetDate,
+                    hour: targetDate.getHours()
+                });
+            }
+
+            // 각 시간대에 대해 예보 데이터 찾기
+            targetHours.forEach(targetTime => {
+                const key = `${targetTime.date}_${targetTime.time}`;
+                const data = hourlyData[key];
+                
+                const dateDisplay = formatDateDisplay(targetTime.displayDate);
+                const displayHour = `${targetTime.hour}시`;
+                const temp = data?.temp || 26;
+                const pop = data?.pop || 0;
+                
+                const skyCode = data?.sky || '3';
+                const ptyCode = data?.pty || '0';
+                
+                let icon = skyConditions[skyCode]?.icon || '🌤️';
+                if (ptyCode !== '0') {
+                    icon = precipConditions[ptyCode]?.icon || icon;
+                }
+
+                hourlyItems += `
+                    <div class="hourly-item">
+                        <div class="hour-date">${dateDisplay}</div>
+                        <div class="hour">${displayHour}</div>
+                        <div class="weather-icon">${icon}</div>
+                        <div class="hour-temp">${temp}°</div>
+                        <div class="rain-percent">${pop}%</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('weather-content').innerHTML = `
+                <div class="main-weather">
+                    <div class="date-location">${dateStr}(${dayName}) ${LOCATION_NAME}</div>
+                    <div class="main-temp-section">
+                        <div class="current-temp">${currentTemp}°</div>
+                        <div class="weather-icon-main">${weatherIcon}</div>
+                    </div>
+                    <div class="temp-range">최저 ${minTemp}° / 최고 ${maxTemp}°</div>
+                </div>
+                
+                <div class="hourly-forecast">
+                    <div class="forecast-title">시간별 날씨</div>
+                    <div class="hourly-grid">
+                        ${hourlyItems}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('update-time').textContent = 
+                `최종 업데이트: ${new Date().toLocaleString('ko-KR')}`;
+        }
+
+        function displaySampleWeather() {
+            // 페이지 제목 업데이트
+            document.getElementById('page-title').textContent = `${LOCATION_NAME} 날씨`;
+            
+            // 현재 시간 기준으로 동적 샘플 데이터 생성
+            const sampleTime = new Date();
+            const dateStr = formatDateDisplay(sampleTime);
+            const dayName = ['일', '월', '화', '수', '목', '금', '토'][sampleTime.getDay()];
+            
+            // 현재 시간 기준 -1시간부터 +7시간까지 샘플 데이터
+            let sampleHourlyItems = '';
+            for (let i = -1; i <= 7; i++) {
+                const targetDate = new Date(sampleTime);
+                targetDate.setHours(sampleTime.getHours() + i);
+                const dateDisplay = formatDateDisplay(targetDate);
+                const displayHour = `${targetDate.getHours()}시`;
+                
+                // 시간대별로 다른 샘플 온도 (밤에는 낮고, 낮에는 높게)
+                const hour24 = targetDate.getHours();
+                let baseTemp = 20;
+                if (hour24 >= 6 && hour24 < 18) {
+                    baseTemp = 25 + Math.sin((hour24 - 6) * Math.PI / 12) * 5; // 낮 시간
+                } else {
+                    baseTemp = 18 + Math.random() * 4; // 밤 시간
+                }
+                const temp = Math.round(baseTemp);
+                
+                // 시간대별 강수확률
+                const pop = Math.floor(Math.random() * 60);
+                
+                // 시간대별 날씨 아이콘
+                const icons = hour24 >= 6 && hour24 < 18 ? ['☀️', '🌤️', '☁️'] : ['🌙', '☁️', '🌤️'];
+                const icon = icons[Math.floor(Math.random() * icons.length)];
+
+                sampleHourlyItems += `
+                    <div class="hourly-item">
+                        <div class="hour-date">${dateDisplay}</div>
+                        <div class="hour">${displayHour}</div>
+                        <div class="weather-icon">${icon}</div>
+                        <div class="hour-temp">${temp}°</div>
+                        <div class="rain-percent">${pop}%</div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('weather-content').innerHTML = `
+                <div class="main-weather">
+                    <div class="date-location">${dateStr}(${dayName}) ${LOCATION_NAME}</div>
+                    <div class="main-temp-section">
+                        <div class="current-temp">${Math.round(20 + Math.random() * 10)}°</div>
+                        <div class="weather-icon-main">🌤️</div>
+                    </div>
+                    <div class="temp-range">최저 ${Math.round(15 + Math.random() * 5)}° / 최고 ${Math.round(28 + Math.random() * 5)}°</div>
+                </div>
+                
+                <div class="hourly-forecast">
+                    <div class="forecast-title">시간별 날씨</div>
+                    <div class="hourly-grid">
+                        ${sampleHourlyItems}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('update-time').textContent = 
+                `샘플 데이터 (${new Date().toLocaleString('ko-KR')}) - API 키 필요`;
+        }
+
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
+        function formatDateDisplay(date) {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${month}/${day}`;
+        }
+
+        // 페이지 로드 시 즉시 실행
+        window.addEventListener('load', function() {
+            console.log('페이지 로드됨, API 호출 시작');
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                console.log('API 키 감지, 실제 데이터 요청');
+                getWeatherData();
+            } else {
+                console.log('API 키 없음, 샘플 데이터 표시');
+                displaySampleWeather();
+            }
+        });
+
+        // DOMContentLoaded에서도 실행 (백업용)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM 로드됨');
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                getWeatherData();
+            } else {
+                displaySampleWeather();
+            }
+        });
+
+        // 즉시 실행 (스크립트 로드와 동시에)
+        setTimeout(function() {
+            console.log('타이머로 데이터 표시');
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                console.log('API 키 있음, 실제 API 호출');
+                getWeatherData();
+            } else {
+                console.log('API 키 없음, 샘플 데이터 표시');
+                displaySampleWeather();
+            }
+        }, 100);
+
+        // 5분마다 자동 새로고침
+        setInterval(function() {
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                getWeatherData();
+            } else {
+                displaySampleWeather();
+            }
+        }, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
