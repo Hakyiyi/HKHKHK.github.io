@@ -153,10 +153,13 @@
         }
 
         .loading, .error {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 40px;
             color: #6c757d;
             width: 100%;
+            height: 140px;
         }
 
         /* 반응형 디자인 */
@@ -569,10 +572,24 @@
         }
 
         // 페이지 로드 시 날씨 데이터 가져오기
-        document.addEventListener('DOMContentLoaded', getWeatherData);
+        document.addEventListener('DOMContentLoaded', function() {
+            // 먼저 샘플 데이터 표시
+            displaySampleWeather();
+            
+            // API 키가 있다면 실제 데이터 시도
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                getWeatherData();
+            }
+        });
 
         // 5분마다 자동 새로고침
-        setInterval(getWeatherData, 5 * 60 * 1000);
+        setInterval(function() {
+            if (API_KEY !== 'YOUR_API_KEY_HERE') {
+                getWeatherData();
+            } else {
+                displaySampleWeather();
+            }
+        }, 5 * 60 * 1000);
     </script>
 </body>
 </html>
