@@ -80,10 +80,7 @@
         }
 
         .forecast-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: #333;
+            display: none;
         }
 
         .hourly-grid {
@@ -101,6 +98,12 @@
             font-size: 11px;
             border: 1px solid #e9ecef;
             transition: all 0.2s ease;
+            min-width: 70px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 140px;
         }
 
         .hourly-item:hover {
@@ -159,22 +162,23 @@
         /* 반응형 디자인 */
         @media (max-width: 768px) {
             .weather-container {
-                flex-direction: column;
-                gap: 15px;
+                height: auto;
+                min-height: 140px;
             }
 
             .main-weather {
-                width: 100%;
-                flex-shrink: unset;
+                width: 210px;
+                height: 140px;
+                flex-shrink: 0;
             }
 
             .hourly-forecast {
-                min-width: unset;
+                height: 140px;
             }
 
-            .hourly-grid {
-                grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
-                gap: 6px;
+            .hourly-item {
+                height: 140px;
+                min-width: 60px;
             }
         }
 
@@ -185,17 +189,15 @@
 
             .main-weather {
                 padding: 12px;
-                width: 100%;
-            }
-
-            .hourly-grid {
-                grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
-                gap: 4px;
+                width: 180px;
+                height: 140px;
             }
 
             .hourly-item {
                 padding: 6px 2px;
                 font-size: 10px;
+                min-width: 50px;
+                height: 140px;
             }
         }
     </style>
@@ -418,26 +420,35 @@
 
             let hourlyItems = '';
             
-            // 시간별 예보 생성 (다음 10개 시간대)
-            const displayCount = Math.min(10, sortedKeys.length);
-            for (let i = 0; i < displayCount; i++) {
-                const key = sortedKeys[i];
+            // 현재 시간 기준으로 -1시간부터 +7시간까지 (총 9시간)
+            const now = new Date();
+            const currentHour = now.getHours();
+            const targetHours = [];
+            
+            // -1시간부터 +7시간까지의 시간대 생성
+            for (let i = -1; i <= 7; i++) {
+                const targetDate = new Date(now);
+                targetDate.setHours(currentHour + i);
+                targetHours.push({
+                    date: formatDate(targetDate),
+                    time: String(targetDate.getHours()).padStart(2, '0') + '00',
+                    displayDate: targetDate,
+                    hour: targetDate.getHours()
+                });
+            }
+
+            // 각 시간대에 대해 예보 데이터 찾기
+            targetHours.forEach(targetTime => {
+                const key = `${targetTime.date}_${targetTime.time}`;
                 const data = hourlyData[key];
                 
-                const forecastDate = new Date(
-                    parseInt(data.date.substring(0, 4)),
-                    parseInt(data.date.substring(4, 6)) - 1,
-                    parseInt(data.date.substring(6, 8))
-                );
-                const dateDisplay = formatDateDisplay(forecastDate);
+                const dateDisplay = formatDateDisplay(targetTime.displayDate);
+                const displayHour = `${targetTime.hour}시`;
+                const temp = data?.temp || 26;
+                const pop = data?.pop || 0;
                 
-                const hour = parseInt(data.time.substring(0, 2));
-                const displayHour = `${hour}시`;
-                const temp = data.temp || 26;
-                const pop = data.pop || 0;
-                
-                const skyCode = data.sky || '3';
-                const ptyCode = data.pty || '0';
+                const skyCode = data?.sky || '3';
+                const ptyCode = data?.pty || '0';
                 
                 let icon = skyConditions[skyCode]?.icon || '🌤️';
                 if (ptyCode !== '0') {
@@ -453,7 +464,7 @@
                         <div class="rain-percent">${pop}%</div>
                     </div>
                 `;
-            }
+            });
 
             document.getElementById('weather-content').innerHTML = `
                 <div class="main-weather">
@@ -481,100 +492,67 @@
             // 페이지 제목 업데이트
             document.getElementById('page-title').textContent = `${LOCATION_NAME} 날씨`;
             
-            // 날짜 포맷팅
+            // 현재 시간 기준으로 동적 샘플 데이터 생성
             const now = new Date();
             const dateStr = formatDateDisplay(now);
             const dayName = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+            
+            // 현재 시간 기준 -1시간부터 +7시간까지 샘플 데이터
+            let sampleHourlyItems = '';
+            for (let i = -1; i <= 7; i++) {
+                const targetDate = new Date(now);
+                targetDate.setHours(now.getHours() + i);
+                const dateDisplay = formatDateDisplay(targetDate);
+                const displayHour = `${targetDate.getHours()}시`;
+                
+                // 시간대별로 다른 샘플 온도 (밤에는 낮고, 낮에는 높게)
+                const hour24 = targetDate.getHours();
+                let baseTemp = 20;
+                if (hour24 >= 6 && hour24 < 18) {
+                    baseTemp = 25 + Math.sin((hour24 - 6) * Math.PI / 12) * 5; // 낮 시간
+                } else {
+                    baseTemp = 18 + Math.random() * 4; // 밤 시간
+                }
+                const temp = Math.round(baseTemp);
+                
+                // 시간대별 강수확률
+                const pop = Math.floor(Math.random() * 60);
+                
+                // 시간대별 날씨 아이콘
+                const icons = hour24 >= 6 && hour24 < 18 ? ['☀️', '🌤️', '☁️'] : ['🌙', '☁️', '🌤️'];
+                const icon = icons[Math.floor(Math.random() * icons.length)];
+
+                sampleHourlyItems += `
+                    <div class="hourly-item">
+                        <div class="hour-date">${dateDisplay}</div>
+                        <div class="hour">${displayHour}</div>
+                        <div class="weather-icon">${icon}</div>
+                        <div class="hour-temp">${temp}°</div>
+                        <div class="rain-percent">${pop}%</div>
+                    </div>
+                `;
+            }
             
             document.getElementById('weather-content').innerHTML = `
                 <div class="main-weather">
                     <div class="date-location">${dateStr}(${dayName}) ${LOCATION_NAME}</div>
                     <div class="main-temp-section">
-                        <div class="current-temp">26°</div>
+                        <div class="current-temp">${Math.round(20 + Math.random() * 10)}°</div>
                         <div class="weather-icon-main">🌤️</div>
                     </div>
-                    <div class="temp-range">최저 22° / 최고 31°</div>
+                    <div class="temp-range">최저 ${Math.round(15 + Math.random() * 5)}° / 최고 ${Math.round(28 + Math.random() * 5)}°</div>
                 </div>
                 
                 <div class="hourly-forecast">
                     <div class="forecast-title">시간별 날씨</div>
                     <div class="hourly-grid">
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">14시</div>
-                            <div class="weather-icon">🌤️</div>
-                            <div class="hour-temp">26°</div>
-                            <div class="rain-percent">20%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">15시</div>
-                            <div class="weather-icon">☀️</div>
-                            <div class="hour-temp">28°</div>
-                            <div class="rain-percent">0%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">16시</div>
-                            <div class="weather-icon">☀️</div>
-                            <div class="hour-temp">30°</div>
-                            <div class="rain-percent">0%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">17시</div>
-                            <div class="weather-icon">☀️</div>
-                            <div class="hour-temp">29°</div>
-                            <div class="rain-percent">0%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">18시</div>
-                            <div class="weather-icon">🌤️</div>
-                            <div class="hour-temp">27°</div>
-                            <div class="rain-percent">10%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/02</div>
-                            <div class="hour">19시</div>
-                            <div class="weather-icon">🌤️</div>
-                            <div class="hour-temp">25°</div>
-                            <div class="rain-percent">10%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/03</div>
-                            <div class="hour">20시</div>
-                            <div class="weather-icon">☁️</div>
-                            <div class="hour-temp">24°</div>
-                            <div class="rain-percent">30%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/03</div>
-                            <div class="hour">21시</div>
-                            <div class="weather-icon">🌧️</div>
-                            <div class="hour-temp">23°</div>
-                            <div class="rain-percent">60%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/03</div>
-                            <div class="hour">22시</div>
-                            <div class="weather-icon">🌧️</div>
-                            <div class="hour-temp">22°</div>
-                            <div class="rain-percent">70%</div>
-                        </div>
-                        <div class="hourly-item">
-                            <div class="hour-date">09/03</div>
-                            <div class="hour">23시</div>
-                            <div class="weather-icon">🌧️</div>
-                            <div class="hour-temp">21°</div>
-                            <div class="rain-percent">80%</div>
-                        </div>
+                        ${sampleHourlyItems}
                     </div>
                 </div>
             `;
             
             document.getElementById('update-time').textContent = 
-                `샘플 데이터 표시 중 - API 키가 필요합니다`;
+                `샘플 데이터 (${new Date().toLocaleString('ko-KR')}) - API 키 필요`;
         }
 
         function formatDate(date) {
