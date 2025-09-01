@@ -318,9 +318,9 @@
         }
 
         function processWeatherData(items) {
-            const now = new Date();
-            const currentDateStr = formatDate(now);
-            const currentHour = now.getHours();
+            const currentTime = new Date();
+            const currentDateStr = formatDate(currentTime);
+            const currentHour = currentTime.getHours();
             
             // 시간별 데이터 그룹화
             const hourlyData = {};
@@ -383,7 +383,6 @@
 
             // 오늘과 내일의 최고/최저 온도 계산
             const todayTemps = [];
-            const tomorrowDateStr = formatDate(new Date(now.getTime() + 24 * 60 * 60 * 1000));
             
             Object.values(hourlyData).forEach(data => {
                 if (data.date === currentDateStr && data.temp !== undefined) {
@@ -417,20 +416,20 @@
             const currentTemp = currentWeather.temp || 26;
             
             // 날짜 포맷팅
-            const now = new Date();
-            const dateStr = formatDateDisplay(now);
-            const dayName = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+            const weatherTime = new Date();
+            const dateStr = formatDateDisplay(weatherTime);
+            const dayName = ['일', '월', '화', '수', '목', '금', '토'][weatherTime.getDay()];
 
             let hourlyItems = '';
             
             // 현재 시간 기준으로 -1시간부터 +7시간까지 (총 9시간)
-            const now = new Date();
-            const currentHour = now.getHours();
+            const currentTime = new Date();
+            const currentHour = currentTime.getHours();
             const targetHours = [];
             
             // -1시간부터 +7시간까지의 시간대 생성
             for (let i = -1; i <= 7; i++) {
-                const targetDate = new Date(now);
+                const targetDate = new Date(currentTime);
                 targetDate.setHours(currentHour + i);
                 targetHours.push({
                     date: formatDate(targetDate),
@@ -496,15 +495,15 @@
             document.getElementById('page-title').textContent = `${LOCATION_NAME} 날씨`;
             
             // 현재 시간 기준으로 동적 샘플 데이터 생성
-            const now = new Date();
-            const dateStr = formatDateDisplay(now);
-            const dayName = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+            const sampleTime = new Date();
+            const dateStr = formatDateDisplay(sampleTime);
+            const dayName = ['일', '월', '화', '수', '목', '금', '토'][sampleTime.getDay()];
             
             // 현재 시간 기준 -1시간부터 +7시간까지 샘플 데이터
             let sampleHourlyItems = '';
             for (let i = -1; i <= 7; i++) {
-                const targetDate = new Date(now);
-                targetDate.setHours(now.getHours() + i);
+                const targetDate = new Date(sampleTime);
+                targetDate.setHours(sampleTime.getHours() + i);
                 const dateDisplay = formatDateDisplay(targetDate);
                 const displayHour = `${targetDate.getHours()}시`;
                 
@@ -571,16 +570,23 @@
             return `${month}/${day}`;
         }
 
-        // 페이지 로드 시 날씨 데이터 가져오기
-        document.addEventListener('DOMContentLoaded', function() {
-            // 먼저 샘플 데이터 표시
+        // 페이지 로드 시 즉시 실행 (DOMContentLoaded 기다리지 않고)
+        window.addEventListener('load', function() {
+            console.log('페이지 로드됨, 샘플 데이터 표시 시작');
             displaySampleWeather();
-            
-            // API 키가 있다면 실제 데이터 시도
-            if (API_KEY !== 'YOUR_API_KEY_HERE') {
-                getWeatherData();
-            }
         });
+
+        // DOMContentLoaded에서도 실행 (백업용)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM 로드됨');
+            displaySampleWeather();
+        });
+
+        // 즉시 실행 (스크립트 로드와 동시에)
+        setTimeout(function() {
+            console.log('타이머로 샘플 데이터 표시');
+            displaySampleWeather();
+        }, 100);
 
         // 5분마다 자동 새로고침
         setInterval(function() {
